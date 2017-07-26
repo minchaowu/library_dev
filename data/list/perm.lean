@@ -665,6 +665,10 @@ else
   have al₂ : a ∉ l₂, from assume otherwise, al₁ (mem_of_perm p.symm otherwise),
   begin simp [al₁, al₂], exact perm_app_left _ p end
 
+theorem perm_insert_cons_of_not_mem {a : α} {l : list α} : a ∉ l → perm (list.insert a l) (a :: l) := 
+assume h, have list.insert a l = concat l a, from if_neg h,
+by rw this; apply perm.symm; rw concat_eq_append; apply perm_cons_app
+
 end perm_insert
 
 section perm_inter
@@ -853,5 +857,54 @@ assume u, perm.rec_on u
              by rw [filter_cons_of_neg _ H1, filter_cons_of_neg _ H2, filter_cons_of_neg _ H2,
                     filter_cons_of_neg _ H1])))
     (λ l₁ l₂ l₃ p₁ p₂ r₁ r₂, trans r₁ r₂)
+
+/- permutation is decidable if α has decidable equality -/
+section dec
+open decidable
+variable [Ha : decidable_eq α]
+include Ha
+
+def decidable_perm_aux :
+  ∀ (n : nat) (l₁ l₂ : list α), length l₁ = n → length l₂ = n → decidable (l₁ ~ l₂)
+| 0     l₁      l₂ H₁ H₂ :=
+  have l₁n : l₁ = [], from eq_nil_of_length_eq_zero H₁,
+  have l₂n : l₂ = [], from eq_nil_of_length_eq_zero H₂,
+  begin rw [l₁n, l₂n], exact (is_true perm.nil) end
+| (n+1) (x::t₁) l₂ H₁ H₂ :=
+  by_cases
+    (assume xinl₂ : x ∈ l₂,
+      -- TODO(Jeremy): it seems the equation editor abstracts t₂, and loses the definition, so
+      --               I had to expand it manually
+      -- let t₂ : list α := erase x l₂ in
+      have len_t₁ : length t₁ = n,
+        begin
+         simp at H₁,
+         have H₁' : nat.succ (length t₁)  = nat.succ n,
+         repeat {rw ←nat.add_one_eq_succ}, simp, exact H₁,
+         injection H₁'
+        end,
+      have length (l₂.erase x) = nat.pred (length l₂), from length_erase_of_mem xinl₂,
+      have length (l₂.erase x) = n, begin rw [this, H₂], reflexivity end,
+      match decidable_perm_aux n t₁ (l₂.erase x) len_t₁ this with
+      | is_true p  := is_true (calc
+          x::t₁ ~ x::l₂.erase x   : skip x p
+           ...  ~ l₂              : perm.symm (perm_erase xinl₂))
+      | is_false np := is_false (λ p : x::t₁ ~ l₂,
+        have (x::t₁).erase x ~ l₂.erase x, from erase_perm_erase_of_perm x p,
+        have t₁ ~ l₂.erase x, begin rw [erase_cons_head] at this, exact this end,
+        absurd this np)
+      end)
+    (assume nxinl₂ : x ∉ l₂,
+      is_false (λ p : x::t₁ ~ l₂, absurd (mem_of_perm p (mem_cons_self _ _)) nxinl₂))
+
+instance decidable_perm : ∀ (l₁ l₂ : list α), decidable (l₁ ~ l₂) :=
+λ l₁ l₂,
+by_cases
+  (assume eql : length l₁ = length l₂,
+    decidable_perm_aux (length l₂) l₁ l₂ eql rfl)
+  (assume neql : length l₁ ≠ length l₂,
+    is_false (λ p : l₁ ~ l₂, absurd (length_eq_length_of_perm p) neql))
+end dec
+
 end perm
 end list

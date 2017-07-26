@@ -103,6 +103,9 @@ lemma erase_of_not_mem {a : α} : ∀{l : list α}, a ∉ l → l.erase a = l
   have aninxs : a ∉ xs, from λ ainxs : a ∈ xs, absurd (or.inr ainxs) h,
   by simp [anex, erase_of_not_mem aninxs]
 
+lemma length_erase_of_not_mem {a : α} : ∀ {l : list α}, a ∉ l → length (l.erase a) = length l
+:= λ l h, by rw erase_of_not_mem; exact h
+
 lemma erase_append_left {a : α} : ∀ {l₁:list α} (l₂), a ∈ l₁ → (l₁++l₂).erase a = l₁.erase a ++ l₂
 | []      l₂  h := absurd h (not_mem_nil a)
 | (x::xs) l₂  h := if h' : x = a then by simp [h']
